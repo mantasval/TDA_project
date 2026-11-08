@@ -1,0 +1,9 @@
+subject,matrix,n_review,mean_change,max_change
+A02T,left_hand_mu,2,0.0,0.0
+A02T,left_hand_beta,2,0.0,0.0
+A02T,right_hand_mu,2,0.0,0.0
+A02T,right_hand_beta,2,0.0,0.0
+A02T,feet_mu,2,0.0,0.0
+A02T,feet_beta,2,0.0,0.0
+A02T,tongue_mu,2,0.001709720317141782,0.010401595356034132
+A02T,tongue_beta,2,0.0017398185441071376,0.010021147444596812

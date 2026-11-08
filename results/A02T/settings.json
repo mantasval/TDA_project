@@ -1,0 +1,79 @@
+{
+  "source_url": "https://lampx.tugraz.at/~bci/database/001-2014/A02T.mat",
+  "sha256": "5ddd5cb520b1692c3ba1363f48d98f58f0e46f3699ee50d749947950fc39db27",
+  "fs": 250,
+  "sample_window_after_trial_marker": [
+    500,
+    1500
+  ],
+  "seconds_after_trial_marker": [
+    2,
+    6
+  ],
+  "eeg_columns": "0-21",
+  "eog_columns": "22-24 (review only)",
+  "reference": "original left mastoid",
+  "added_filter": "none",
+  "normalization": "none",
+  "detrending": "subtract each Welch window mean",
+  "window": "periodic Hann",
+  "nperseg": 250,
+  "noverlap": 125,
+  "nfft": 250,
+  "windows_per_trial": 7,
+  "bands": {
+    "mu": "8 <= f < 13",
+    "beta": "13 <= f <= 30"
+  },
+  "spectral_pooling": "complex cross spectra and auto spectra averaged over trials before coherence",
+  "main_seed": 42,
+  "selection_seeds": [
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119
+  ],
+  "primary_n_each": 66,
+  "common_n_each": 49,
+  "review_cutoff_uv": 126.44388671875001,
+  "review_original_ids": [
+    [
+      7,
+      45
+    ],
+    [
+      8,
+      44
+    ]
+  ],
+  "review_rule": "median + 6 * 1.4826 * MAD; review only",
+  "filtration": "weighted flag complex; D=1-bandmean magnitude-squared coherence",
+  "maxdim": 1,
+  "coeff": 2,
+  "threshold": 1.0,
+  "stable_rank": "count death-birth > t; infinite H0 retained",
+  "total_persistence": "sum of finite lifetimes (infinite H0 omitted only from scalar area)",
+  "versions": {
+    "numpy": "2.3.5",
+    "scipy": "1.17.0",
+    "ripser": "0.6.15",
+    "matplotlib": "3.10.8",
+    "pandas": "2.2.3"
+  }
+}

@@ -1,0 +1,9 @@
+subject,matrix,n_review,mean_change,max_change
+A05T,left_hand_mu,0,0.0,0.0
+A05T,left_hand_beta,0,0.0,0.0
+A05T,right_hand_mu,0,0.0,0.0
+A05T,right_hand_beta,0,0.0,0.0
+A05T,feet_mu,0,0.0,0.0
+A05T,feet_beta,0,0.0,0.0
+A05T,tongue_mu,0,0.0,0.0
+A05T,tongue_beta,0,0.0,0.0

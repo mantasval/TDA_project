@@ -1,0 +1,175 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.3cm]{geometry}
+\usepackage{amsmath,amssymb,booktabs,graphicx,longtable,float}
+\usepackage{microtype,xcolor,caption}
+\usepackage[hidelinks]{hyperref}
+\usepackage{enumitem}
+\usepackage[section]{placeins}
+\setlength{\parskip}{0.4em}
+\setlength{\parindent}{0pt}
+\setlist{nosep,leftmargin=*}
+\captionsetup{font=small,labelfont=bf}
+\definecolor{navy}{HTML}{172C49}
+\graphicspath{{figures/}}
+\newcommand{\EEG}{\textsc{eeg}}
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\ind}{\mathbf{1}}
+
+\begin{document}
+\hypersetup{pageanchor=false}
+\begin{titlepage}
+\centering
+\vspace*{1.6cm}
+{\Large SF2956 Topological Data Analysis\par}
+\vspace{2.3cm}
+{\Huge\bfseries\color{navy} Topological Analysis of\\[0.35cm]Motor Imagery EEG Data\par}
+\vspace{1cm}
+{\Large Frequency-specific dependence networks\\from nine participants\par}
+\vspace{2cm}
+{\large Galya Gadzhalova\par}
+% Add any additional group authors here before submission.
+\vfill
+{\large Project report\\6 November 2026\par}
+\vspace{1cm}
+{\small BCI Competition IV, data set 2a / BNCI 001-2014\par}
+\end{titlepage}
+\pagenumbering{roman}
+\hypersetup{pageanchor=true}
+\tableofcontents
+\clearpage
+\pagenumbering{arabic}
+
+\input{abstract.tex}
+
+\section{Objective and research question}
+This project asks: \emph{Do different imagined movements produce different topological signatures in frequency-specific EEG dependence networks, and are those patterns consistent across participants?} The four conditions are imagined left-hand, right-hand, feet and tongue movements. The analysis first compares conditions within each participant, then examines consistency across nine participants.
+
+The object being analysed is a network of EEG sensors. Each vertex represents a channel; edge weights describe spectral dependence between two channels during one movement condition. Persistent homology follows the network over a range of thresholds, and stable ranks summarize the resulting barcodes. The purpose is to describe and compare dependence structure. No movement classifier, prediction accuracy, anatomical source localization or causal communication model is fitted.
+
+El Yaagoubi Bourakna, Chung and Ombao motivate the use of coherence-derived dissimilarities for multivariate time-series topology \cite{bourakna2022}. This project adapts that approach to trial-pooled Welch spectra and the course's barcode/stable-rank framework. It is not an exact reproduction of the paper's kernel-smoothed periodogram or its application. The supplied lecture handouts connect single-linkage components, barcodes, simplicial complexes and homology \cite{lectures}; the standard-contour convention used here is also specified by Chach\'olski and Riihim\"aki \cite{chacholski2020}.
+
+\section{Data and observation units}
+\subsection{Dataset}
+The data are the nine training-session MATLAB files \texttt{A01T.mat}--\texttt{A09T.mat} from BNCI 001-2014, originally released as BCI Competition IV data set 2a \cite{bnci,brunner2008}. Each participant has four movement-imagery classes, six task runs and 48 trials per run, giving 288 original trials per training session. The available evaluation sessions are not used here. There are 22 EEG and three electrooculography (EOG) channels, sampled at 250 Hz. The original acquisition used a left-mastoid reference, a 0.5--100 Hz bandpass and a 50 Hz notch \cite{brunner2008}.
+
+The cue starts two seconds after the trial marker and imagery continues until six seconds. Thus the analysed interval is $[2,6)$ seconds relative to the trial marker, or $[0,4)$ seconds after the cue. Calibration blocks have no task trials and are skipped. A04 has a different calibration-block structure, so blocks are selected by their trial markers rather than their positions \cite{brunner2008}.
+
+\begin{table}[htbp]
+\centering
+\caption{Variables used from each MATLAB recording block.}
+\begin{tabular}{ll}
+\toprule Variable & Meaning in this analysis \\
+\midrule
+\texttt{X} & Samples $\times$ 25 signal channels \\
+\texttt{trial} & Trial-start sample markers, originally one-based \\
+\texttt{y} & Movement labels: 1 left, 2 right, 3 feet, 4 tongue \\
+\texttt{artifacts} & Original trial-level artifact indicators \\
+\texttt{fs} & Sampling frequency in Hz \\
+\texttt{classes} & Class names used to verify the label order \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Blocks, channels and trials}
+A \emph{block} is a continuous recording run. A \emph{channel} is one sensor's time series. A \emph{trial epoch} is the four-second window extracted for one imagery instruction. Each retained trial therefore has shape $1000\times22$: 1,000 time samples and 22 EEG channels. These samples, channels and repeated trials are nested within participants. The independent units for the group comparison are the nine participants, not the individual time points or channels.
+
+\section{Data preparation}
+\subsection{Extraction and exclusions}
+For every task block, MATLAB sample indices are converted to zero-based Python indices. An epoch starts 500 samples after its trial marker and contains 1,000 samples. Only EEG columns 1--22 enter the network analysis. EOG channels are retained for visual inspection. Original block and trial identifiers are kept throughout so every selected or excluded trial can be traced.
+
+Trials with a nonzero dataset artifact flag or a nonfinite EEG value are excluded. The code stops if a retained channel is flat or an epoch is incomplete, rather than assigning an arbitrary coherence value. All nine files passed these additional checks; the observed exclusions came from the dataset artifact flags. No additional time-domain filtering, ICA, re-referencing or baseline subtraction is applied. Mean removal occurs inside each Welch window, as described below. This is a consistent baseline preparation protocol, not a claim that every retained trial is artifact-free.
+
+\subsection{Amplitude review}
+For trial $r$, define its largest channel peak-to-peak amplitude as
+\begin{equation}
+ A_r=\max_{i=1,\ldots,22}\{\max_t X_{ri}(t)-\min_t X_{ri}(t)\}.
+\end{equation}
+Within each participant, flag $A_r>\operatorname{median}(A)+6\times1.4826\times\operatorname{MAD}(A)$, where MAD is the median absolute deviation from the median. These are \emph{review candidates}; they remain in the primary analysis. EEG and EOG plots are saved for each flagged trial. A sensitivity scenario temporarily removes all candidates and recalculates the all-retained coherence matrices. The mean absolute matrix change is calculated over the $\binom{22}{2}=231$ unique off-diagonal EEG pairs; the maximum reports the most changed pair. These changes are neither $p$-values nor tests of neural origin.
+
+\subsection{Balancing and scale}
+For participant $s$, let $n_s$ be the smallest retained trial count among the four movements. Randomly select $n_s$ trials without replacement from each class using seed 42. This matches the original A01 notebook and prevents movement comparisons from using different numbers of spectral realizations within a participant. A secondary analysis uses 49 trials per movement for every participant, the smallest available count in the entire dataset. This checks sensitivity to different sample sizes across people; it is one seeded selection.
+
+EEG is not z-scored across people. Coherence is dimensionless, and a fixed nonzero scale multiplier applied to a channel across its trials cancels between its numerator and denominator. This property does not remove differences in reference, noise, trial amplitudes, anatomy or signal mixing. Participants' raw recordings are never concatenated or averaged together.
+
+\section{Analysis methods}
+\subsection{From EEG traces to channel dissimilarities}
+Each trial is analysed separately using Welch estimation with 250-sample periodic Hann windows, 125-sample overlap, a 250-point Fourier transform and constant detrending. A four-second epoch yields seven overlapping windows and 1-Hz frequency spacing. These overlapping windows are not seven independent observations. Spectra are averaged over windows, then pooled over selected trials within one participant and movement. The implementation uses SciPy's Welch and cross-spectral-density functions \cite{scipycsd}.
+
+Let $\widehat S^{(r)}_{ij}(f)$ denote the complex cross-spectrum for channels $i,j$ in trial $r$. For movement $m$ with $n_{sm}$ selected trials,
+\begin{align}
+ \overline S_{ij,sm}(f)&=\frac{1}{n_{sm}}\sum_{r\in\mathcal I_{sm}}\widehat S^{(r)}_{ij}(f),\\
+ \widehat C_{ij,sm}(f)&=\frac{|\overline S_{ij,sm}(f)|^2}
+ {\overline S_{ii,sm}(f)\overline S_{jj,sm}(f)}.
+\end{align}
+The complex spectra are averaged \emph{before} taking the squared magnitude. Averaging raw EEG traces or averaging trial-specific coherence values would produce a different estimator.
+
+Use frequency bins $F_\mu=\{8,9,10,11,12\}$ Hz and $F_\beta=\{13,14,\ldots,30\}$ Hz. The band-specific dissimilarity is
+\begin{equation}
+ D^{(B)}_{ij,sm}=1-\frac{1}{|F_B|}\sum_{f\in F_B}\widehat C_{ij,sm}(f),
+ \qquad D^{(B)}_{ii,sm}=0.
+\end{equation}
+A small value indicates stronger estimated dependence in that band. Each matrix is symmetric, finite and bounded by zero and one. It compares channels, not trials or people. The primary analysis produces $9\times4\times2=72$ matrices of size $22\times22$.
+
+\subsection{Filtration and persistent homology}
+For each matrix, form the weighted flag complex
+\begin{equation}
+ K_\epsilon=\{\sigma\subseteq\{1,\ldots,22\}:\sigma\ne\varnothing,
+ D_{ij}\leq\epsilon\text{ for all }i,j\in\sigma\}.
+\end{equation}
+All vertices exist at zero. Edges enter as their dissimilarities are reached; whenever all edges of a triangle exist, its interior is included. Larger cliques are treated similarly. As $\epsilon$ increases, complexes are nested. The transformation $1-C$ need not satisfy the triangle inequality, but this flag construction remains valid. Metric-space stability theorems should not automatically be applied to these matrices.
+
+Ripser computes homology over $\mathbb F_2$ in dimensions 0 and 1, with maximum threshold 1 \cite{ripser}. $H_0$ tracks connected components merging; $H_1$ tracks loops before they become boundaries of filled simplices. A barcode interval $[b,d)$ records the birth and death thresholds of a feature. Thresholds and lifespans are dimensionless, not time in seconds. Since every edge has entered by 1, there is one essential (infinite) $H_0$ interval and no infinite $H_1$ intervals. The finite $H_0$ death thresholds are independently checked against minimum-spanning-tree edge weights.
+
+\subsection{Stable ranks and two kinds of summary}
+With the standard contour $C(b,t)=b+t$, the stable rank is
+\begin{equation}
+ R_q(t)=\sum_{[b,d)\in\mathcal B_q}\ind\{d-b>t\},\qquad q\in\{0,1\}.
+\end{equation}
+It counts features whose lifespans strictly exceed the cutoff $t$ \cite{chacholski2020}. The infinite $H_0$ interval is retained, so $R_0$ eventually equals 1. $R_1$ eventually equals 0. For $H_0$, all births are zero, so the curve also describes the component count along the edge-threshold filtration. For $H_1$, a lifespan cutoff is distinct from a filtration threshold.
+
+Two movement curves are compared within the same participant, band and homology by
+\begin{equation}
+ L_1(R_a,R_b)=\int_0^\infty |R_a(t)-R_b(t)|\,dt.
+\end{equation}
+The code integrates exactly over the union of barcode-lifespan breakpoints. Equal essential $H_0$ tails cancel. A larger value means more different lifespan distributions. The resulting $4\times4$ movement-comparison matrix differs from the $22\times22$ channel dissimilarity matrix. Stable ranks can lose information: different barcode birth positions can produce the same lifespan summary.
+
+The scalar finite total persistence is $T_q=\sum_{d<\infty}(d-b)$. It equals $\int(R_0-1)$ for $H_0$ and $\int R_1$ for $H_1$. Larger $T_0$ means component mergers generally require larger dissimilarity thresholds. Larger $T_1$ can reflect more loops, longer loops or both; it does not directly imply greater activation or better brain function.
+
+\subsection{Sensitivity and group analysis}
+Repeat within-participant balancing 20 times using seeds 100--119. Re-estimate matrices and persistence for each selection. Plot pointwise medians and observed minimum--maximum ranges of stable ranks on a 0.0005-spaced display grid. Exact curve distances still use barcode breakpoints. Overlapping selections are dependent; their ranges are not confidence intervals. The smallest class is fully retained in every selection, which can make its curve identical across repetitions.
+
+Across participants, summarize the six within-person movement-pair distances by their medians and show paired finite total persistence for each condition. An exploratory four-condition omnibus comparison uses the Friedman rank statistic for $T_q$ separately in the two bands and homology dimensions. Under the null of exchangeable movement labels within participants, randomly permute the four labels independently within each participant 99,999 times (seed 2026). Report
+\begin{equation}
+ p=\frac{1+\#\{Q_{\rm perm}\geq Q_{\rm observed}\}}{100000}.
+\end{equation}
+The statistic is tie-corrected and checked against SciPy; its asymptotic chi-squared $p$-value is not used because this is a small repeated-measures dataset \cite{friedman}. Holm adjustment is applied across the four primary tests. Kendall's $W=Q/(9\times3)$ describes consistency of condition ranks. The common-count sensitivity repeats the same test family separately. These are exploratory tests of one scalar summary, not comprehensive tests of barcode equality or of every visible curve separation. A descriptive feet/tongue-minus-hands contrast is motivated by the earlier A01 plot and is not treated as a pre-specified confirmatory hypothesis.
+
+\section{Results}
+\input{results.tex}
+
+\section{Discussion and limitations}
+\input{discussion.tex}
+
+\section{Conclusion}
+\input{conclusion.tex}
+
+\section*{Reproducibility}
+\addcontentsline{toc}{section}{Reproducibility}
+The completed notebook contains the preparation, estimation, topology, repeated-selection and group-analysis code with executed outputs. Each participant's folder stores a trial audit, settings and source-file SHA-256, selected trial IDs, coherence/dissimilarity matrices, barcodes, stable-rank arrays, exact movement distances and figures. The group CSV files contain the values used in this report. Cached per-trial spectral matrices reproduce the original A01 implementation to a maximum absolute matrix difference of $4.44\times10^{-16}$; the A01 barcode counts and distance results also reproduce. The source files can be downloaded from the official links in the notebook. Raw data are not bundled in the project archive.
+
+\input{software.tex}
+
+\begin{thebibliography}{9}
+\bibitem{bnci} BNCI Horizon 2020. \emph{Four class motor imagery (001-2014)}. \url{https://bnci-horizon-2020.eu/database/data-sets}. Accessed 6 November 2026.
+\bibitem{brunner2008} C. Brunner, R. Leeb, G. R. M\"uller-Putz, A. Schl\"ogl and G. Pfurtscheller. \emph{BCI Competition 2008 -- Graz data set A}. Dataset description. \url{https://lampx.tugraz.at/~bci/database/001-2014/description.pdf}.
+\bibitem{bourakna2022} A. El Yaagoubi Bourakna, M. K. Chung and H. Ombao. \emph{Topological Data Analysis for Multivariate Time Series Data}. arXiv:2204.13799, 28 April 2022. \url{https://arxiv.org/abs/2204.13799}. Subsequently published in \emph{Entropy} 25(11), 1509 (2023).
+\bibitem{chacholski2020} W. Chach\'olski and H. Riihim\"aki. \emph{Metrics and stabilization in one parameter persistence}. arXiv:1904.02905v2, 2020; \emph{SIAM Journal on Applied Algebra and Geometry} 4(1). Sections 5.3 and 8. \url{https://arxiv.org/abs/1904.02905}.
+\bibitem{lectures} SF2956 Topological Data Analysis. Supplied lecture handouts 9--12: barcodes and stable ranks; simplicial complexes; Vietoris--Rips constructions; homology. Course materials.
+\bibitem{scipycsd} SciPy developers. \emph{scipy.signal.csd and Welch spectral estimation}. \url{https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.csd.html}.
+\bibitem{ripser} Ripser.py developers. \emph{ripser.ripser reference documentation}. \url{https://ripser.scikit-tda.org/en/latest/reference/stubs/ripser.ripser.html}.
+\bibitem{friedman} SciPy developers. \emph{scipy.stats.friedmanchisquare reference documentation}. \url{https://docs.scipy.org/doc/scipy/reference/generated/scipy.stats.friedmanchisquare.html}.
+\end{thebibliography}
+\end{document}
